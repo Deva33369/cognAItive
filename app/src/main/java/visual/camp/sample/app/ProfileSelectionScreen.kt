@@ -1,9 +1,9 @@
-package com.example.cognaitive
+package visual.camp.sample.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+//import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
-import com.example.cognaitive.ui.theme.CognAItiveTheme
+import visual.camp.sample.app.theme.CognAItiveTheme
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController

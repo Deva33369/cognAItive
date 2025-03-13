@@ -1,4 +1,4 @@
-package com.example.cognaitive
+package visual.camp.sample.app
 
 data class MemoryCard(
     val id: Int,

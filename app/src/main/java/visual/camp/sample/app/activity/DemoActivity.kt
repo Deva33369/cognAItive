@@ -1,107 +1,161 @@
 package visual.camp.sample.app.activity
 
-import android.graphics.BitmapFactory
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Bundle
 import android.util.Log
-import android.widget.ImageView
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import camp.visual.gazetracker.GazeTracker
 import camp.visual.gazetracker.callback.GazeCallback
 import camp.visual.gazetracker.filter.OneEuroFilterManager
-import camp.visual.gazetracker.state.EyeMovementState
-import camp.visual.gazetracker.util.ViewLayoutChecker
 import visual.camp.sample.app.GazeTrackerManager
-import visual.camp.sample.app.R
-import visual.camp.sample.view.GazePathView
-import java.io.IOException
-import java.io.InputStream
+import kotlin.random.Random
 
 class DemoActivity : AppCompatActivity() {
-    private val viewLayoutChecker = ViewLayoutChecker()
-    private var gazePathView: GazePathView? = null
-    private var gazeTrackerManager: GazeTrackerManager? = null
-    private val oneEuroFilterManager = OneEuroFilterManager(
-        2, 30f, 0.5f, 0.001f, 1.0f
-    )
+    private lateinit var mazeView: MazeView
+    private val oneEuroFilterManager = OneEuroFilterManager(2, 30f, 0.5f, 0.001f, 1.0f)
+    private lateinit var gazeTrackerManager: GazeTrackerManager
+    private var playerX = 1
+    private var playerY = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_demo)
-        gazeTrackerManager = GazeTrackerManager.getInstance(applicationContext) // Use getInstance
-        Log.i(TAG, "gazeTracker version: ${GazeTracker.getVersionName()}")
+        gazeTrackerManager = GazeTrackerManager.getInstance(applicationContext)
+        mazeView = MazeView(this)
+        setContentView(mazeView)
     }
 
     override fun onStart() {
         super.onStart()
-        Log.i(TAG, "onStart")
-        gazeTrackerManager!!.setGazeTrackerCallbacks(gazeCallback)
-        initView()
+        gazeTrackerManager.setGazeTrackerCallbacks(gazeCallback)
     }
 
     override fun onResume() {
         super.onResume()
-        gazeTrackerManager!!.startGazeTracking()
-        setOffsetOfView()
-        Log.i(TAG, "onResume")
+        gazeTrackerManager.startGazeTracking()
     }
 
     override fun onPause() {
         super.onPause()
-        gazeTrackerManager!!.stopGazeTracking()
-        Log.i(TAG, "onPause")
+        gazeTrackerManager.stopGazeTracking()
     }
 
     override fun onStop() {
         super.onStop()
-        gazeTrackerManager!!.removeCallbacks(gazeCallback)
-        Log.i(TAG, "onStop")
+        gazeTrackerManager.removeCallbacks(gazeCallback)
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-    }
+    private val gazeCallback = GazeCallback { gazeInfo ->
+        if (oneEuroFilterManager.filterValues(gazeInfo.timestamp, gazeInfo.x, gazeInfo.y)) {
+            val filtered = oneEuroFilterManager.filteredValues  // Get filtered gaze coordinates
+            val gazeX = (filtered[0] / mazeView.cellSize).toInt()
+            val gazeY = (filtered[1] / mazeView.cellSize).toInt()
 
-    private fun initView() {
-        gazePathView = findViewById(R.id.gazePathView)
+            // Check if the move is valid
+            if (mazeView.isPath(gazeX, gazeY)) {
+                playerX = gazeX
+                playerY = gazeY
+                mazeView.setPlayerPosition(playerX, playerY)
+            }
 
-        val am = resources.assets
-        var `is`: InputStream? = null
-
-        try {
-            `is` = am.open("palace_seoul.jpg")
-            val bm = BitmapFactory.decodeStream(`is`)
-            val catView = findViewById<ImageView>(R.id.catImage)
-            catView.setImageBitmap(bm)
-            `is`.close()
-        } catch (e: IOException) {
-            e.printStackTrace()
+            // Check if the player reached the goal
+            if (playerX == mazeView.exitX && playerY == mazeView.exitY) {
+                runOnUiThread {
+                    toast("You reached the goal!")
+                }
+            }
         }
     }
 
-    private fun setOffsetOfView() {
-        viewLayoutChecker.setOverlayView(
-            gazePathView!!
-        ) { x, y ->
-            gazePathView!!.setOffset(
-                x,
-                y
-            )
+
+    private fun toast(message: String) {
+        runOnUiThread {
+            android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
-    private val gazeCallback =
-        GazeCallback { gazeInfo ->
-            if (oneEuroFilterManager.filterValues(gazeInfo.timestamp, gazeInfo.x, gazeInfo.y)) {
-                val filtered = oneEuroFilterManager.filteredValues
-                gazePathView!!.onGaze(
-                    filtered[0],
-                    filtered[1],
-                    gazeInfo.eyeMovementState == EyeMovementState.FIXATION
-                )
+    // 🟢 INNER CLASS FOR THE MAZE VIEW 🟢
+    inner class MazeView(context: Context) : View(context) {
+        private val cols = 25
+        private val rows = 25
+        var cellSize: Float = 0f
+        private val maze = Array(rows) { IntArray(cols) { 1 } } // 1 = Wall, 0 = Path
+        private val paint = Paint()
+        var exitX = cols - 2
+        var exitY = rows - 2
+        private var playerX = 1
+        private var playerY = 1
+
+        init {
+            generateMaze()
+        }
+
+        fun setPlayerPosition(x: Int, y: Int) {
+            playerX = x
+            playerY = y
+            invalidate()
+        }
+
+        fun isPath(x: Int, y: Int): Boolean {
+            return x in 0 until cols && y in 0 until rows && maze[y][x] == 0
+        }
+
+        private fun generateMaze() {
+            val startX = 1
+            val startY = 1
+            val stack = mutableListOf(Pair(startX, startY))
+            maze[startY][startX] = 0
+
+            val directions = listOf(Pair(2, 0), Pair(-2, 0), Pair(0, 2), Pair(0, -2))
+
+            while (stack.isNotEmpty()) {
+                val (x, y) = stack.removeLast()
+                directions.shuffled().forEach { (dx, dy) ->
+                    val nx = x + dx
+                    val ny = y + dy
+                    if (nx in 1 until cols - 1 && ny in 1 until rows - 1 && maze[ny][nx] == 1) {
+                        maze[ny][nx] = 0
+                        maze[y + dy / 2][x + dx / 2] = 0
+                        stack.add(Pair(nx, ny))
+                    }
+                }
             }
         }
 
-    companion object {
-        private const val TAG = "DemoActivity"  // Simplified declaration
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            cellSize = width / cols.toFloat()
+
+            for (row in 0 until rows) {
+                for (col in 0 until cols) {
+                    paint.color = if (maze[row][col] == 1) Color.BLACK else Color.WHITE
+                    canvas.drawRect(
+                        col * cellSize, row * cellSize,
+                        (col + 1) * cellSize, (row + 1) * cellSize, paint
+                    )
+                }
+            }
+
+            // Draw Player
+            paint.color = Color.RED
+            canvas.drawCircle(
+                (playerX + 0.5f) * cellSize,
+                (playerY + 0.5f) * cellSize,
+                cellSize / 3,
+                paint
+            )
+
+            // Draw Exit
+            paint.color = Color.GREEN
+            canvas.drawCircle(
+                (exitX + 0.5f) * cellSize,
+                (exitY + 0.5f) * cellSize,
+                cellSize / 3,
+                paint
+            )
+        }
     }
 }

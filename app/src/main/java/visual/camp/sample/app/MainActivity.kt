@@ -1,4 +1,4 @@
-package visual.camp.sample.app.activity
+package visual.camp.sample.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
+import visual.camp.sample.app.activity.MazeGameScreen
 import visual.camp.sample.app.theme.CognAItiveTheme
 
 class MainActivity : ComponentActivity() {

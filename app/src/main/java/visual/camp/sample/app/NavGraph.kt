@@ -1,4 +1,4 @@
-package com.example.cognaitive
+package visual.camp.sample.app
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
@@ -20,7 +20,7 @@ fun GameGraph(navController: NavHostController) {
         navigation(startDestination = Screen.ProfileLandingScreen.route, route = "main_graph") {
             composable(route = Screen.ProfileLandingScreen.route) { ProfileLandingScreen(navController = navController) }
             composable(route = Screen.CardPairGameScreen.route) { CardPairGameScreen(navController = navController) }
-            composable(route = Screen.MazeGameScreen.route) { MazeGameScreen(navController = navController) }
+            //composable(route = Screen.MazeGameScreen.route) { MazeGameScreen(navController = navController) }
             composable(route = Screen.GameResultScreen.route) { GameResultScreen(navController = navController) }
 
         }

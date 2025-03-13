@@ -1,4 +1,4 @@
-package com.example.cognaitive.ui.theme
+package visual.camp.sample.app.theme
 
 import androidx.compose.ui.graphics.Color
 
