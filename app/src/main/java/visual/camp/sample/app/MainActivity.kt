@@ -19,37 +19,38 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             CognAItiveTheme {
-                var navController = rememberNavController()
-                MainScreen()
+                val navController = rememberNavController()
+
+                GameGraph(navController)
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainScreen() {
-    val context = LocalContext.current  // Get current context
-
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Main Screen") }) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(text = "Welcome to Main Screen!", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(onClick = {
-                val intent = Intent(context, MazeGameScreen::class.java)
-                context.startActivity(intent)  // Start MazeGameScreen Activity
-            }) {
-                Text("Go to Maze Game")
-            }
-        }
-    }
-}
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun MainScreen() {
+//    val context = LocalContext.current  // Get current context
+//
+//    Scaffold(
+//        topBar = { TopAppBar(title = { Text("Main Screen") }) }
+//    ) { padding ->
+//        Column(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(padding)
+//                .padding(16.dp),
+//            verticalArrangement = Arrangement.Center
+//        ) {
+//            Text(text = "Welcome to Main Screen!", style = MaterialTheme.typography.headlineMedium)
+//            Spacer(modifier = Modifier.height(16.dp))
+//
+//            Button(onClick = {
+//                val intent = Intent(context, MazeGameScreen::class.java)
+//                context.startActivity(intent)  // Start MazeGameScreen Activity
+//            }) {
+//                Text("Go to Maze Game")
+//            }
+//        }
+//    }
+//}
