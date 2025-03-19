@@ -1,86 +1,273 @@
 package visual.camp.sample.app
 
 import android.os.Bundle
+import android.text.format.DateUtils.formatElapsedTime
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-//import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-//import androidx.compose.ui.tooling.data.EmptyGroup.data
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavController
-import androidx.navigation.compose.NavHost
-import visual.camp.sample.app.theme.CognAItiveTheme
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class GameViewModel : ViewModel() {
-    private var _memoryCardList = MutableStateFlow(data.MemoryCardList.toList())
+    private var _memoryCardList = MutableStateFlow<List<MemoryCard>>(emptyList())
     val memoryCardList = _memoryCardList.asStateFlow()
 
     private var firstCard: MemoryCard? = null
     private var secondCard: MemoryCard? = null
 
-    private var _elapsedTime = mutableIntStateOf(0)
+    private var _elapsedTime = mutableLongStateOf(0)
     val elapsedTime = _elapsedTime
 
     private var _isPaused = mutableStateOf(false)
     val isPaused = _isPaused
 
+    private var _isGameStarted = mutableStateOf(false)
+    private var _elapsedJob: Job? = null
+
     fun init() {}
-    fun startNewGame() {}
+
+    private fun startTimer() {
+        _elapsedJob?.cancel()
+        _elapsedJob = viewModelScope.launch {
+            while (!_isPaused.value) {
+                delay(1000)
+                if (!_isPaused.value) {
+                    _elapsedTime.value += 1
+                }
+            }
+        }
+    }
+
+    private fun generateCards(difficulty: String): List<MemoryCard> {
+        val numCards = when (difficulty.lowercase()) {
+            "easy" -> 12
+            "normal" -> 16
+            "hard" -> 20
+            "insane" -> 28
+            "1" -> 12
+            "2" -> 16
+            "3" -> 20
+            "4" -> 28
+            else -> 12
+        }
+
+        val numPairs = numCards / 2
+
+        val cardList = mutableListOf<MemoryCard>()
+
+        for (i in 0 until numPairs) {
+            val id = i + 1
+
+            val imageResId = data.MemoryCardList[i].imageResId
+
+            cardList.add(MemoryCard(id = id, imageResId = imageResId, isFlipped = false))
+            cardList.add(MemoryCard(id = id, imageResId = imageResId, isFlipped = false))
+        }
+
+        cardList.shuffle()
+
+        return cardList
+    }
+
+    fun startNewGame(difficulty: String) {
+        _memoryCardList.value = generateCards(difficulty)
+        _isPaused.value = false
+        _elapsedTime.longValue = 0
+        startTimer()
+    }
     fun pause() {
         _isPaused.value = true
     }
     fun resume() {
         _isPaused.value = false
+        startTimer()
     }
 
     fun flipCard(card: MemoryCard) {
+        if (card.isFlipped) return
+
+        card.isFlipped = true
+
         if (firstCard == null) {
             firstCard = card
         }
-        if (secondCard == null) {
+        else if (secondCard == null) {
             secondCard = card
-        }
 
+            if (firstCard?.id == secondCard?.id) {
+                firstCard = null
+                secondCard = null
+            } else {
+                viewModelScope.launch {
+                    delay(1000)
+                    firstCard?.isFlipped = false
+                    secondCard?.isFlipped = false
+                    firstCard = null
+                    secondCard = null
+                }
+            }
+        }
     }
 
     fun gameEnd() {}
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardPairGameScreen(
     navController: NavController = rememberNavController(),
     viewModel: GameViewModel = viewModel()
 )
 {
-    // Code Body
+    val memoryCardList by viewModel.memoryCardList.collectAsState()
+    val isPaused = viewModel.isPaused.value
+    val elapsedTime by viewModel.elapsedTime
+
+    LaunchedEffect(Unit) {
+        viewModel.startNewGame("easy")
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Memory Card Game") },
+                actions = {
+                    IconButton(onClick = { viewModel.pause() }) {
+                        Icon(imageVector = Icons.Filled.Menu, contentDescription = "Pause Game")
+                    }
+                }
+            )
+        },
+        modifier = Modifier.fillMaxSize()
+    ) { paddingValues ->
+        Text(
+            text = "Elapsed Time: ${formatElapsedTime(elapsedTime)}",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier
+                .padding(32.dp)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(32.dp)
+            ) {
+                items(memoryCardList) { card ->
+                    MemoryCardView(card = card, onCardClick = {
+                        if (!isPaused) {
+                            viewModel.flipCard(it)
+                        }
+                    })
+                }
+            }
+
+            if (isPaused) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 1f), shape = RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Elapsed Time: ${formatElapsedTime(elapsedTime)}",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(32.dp)
+                    )
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            "Game Paused",
+                            color = Color.White,
+                            style = MaterialTheme.typography.headlineMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { viewModel.resume() }
+                        ) {
+                            Text("Resume Game")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { viewModel.startNewGame("easy") }
+                        ) {
+                            Text("Restart Game")
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
-fun memoryCardView(card: MemoryCard, onCardClick: (MemoryCard) -> Unit) {
+fun MemoryCardView(card: MemoryCard, onCardClick: (MemoryCard) -> Unit) {
     val cardSize = 100.dp
 
-    val cardState = if (card.isFlipped) {
+    if (card.isFlipped) {
         Image(
             painter = painterResource(id = card.imageResId),
             contentDescription = null,
