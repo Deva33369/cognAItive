@@ -2,7 +2,7 @@ package visual.camp.sample.app
 
 data class MemoryCard(
     val id: Int,
-    var isFlipped: Boolean = false,
+    val isFlipped: Boolean = false,
     val imageResId: Int
 )
 

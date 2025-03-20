@@ -2,6 +2,7 @@ package visual.camp.sample.app
 
 import android.os.Bundle
 import android.text.format.DateUtils.formatElapsedTime
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -131,9 +133,15 @@ class GameViewModel : ViewModel() {
     }
 
     fun flipCard(card: MemoryCard) {
+        Log.d("Flipcard","Attempting to flip card with ID: ${card.id}, currently flipped: ${card.isFlipped}")
         if (card.isFlipped) return
 
-        card.isFlipped = true
+        val updatedList = _memoryCardList.value.map {
+            if (it === card && !it.isFlipped) {
+                it.copy(isFlipped = true)
+            } else it
+        }
+        _memoryCardList.value = updatedList
 
         if (firstCard == null) {
             firstCard = card
@@ -145,12 +153,25 @@ class GameViewModel : ViewModel() {
                 firstCard = null
                 secondCard = null
             } else {
+                Log.d("Flipcard", "Cards don't match, will unflip after delay")
                 viewModelScope.launch {
                     delay(1000)
-                    firstCard?.isFlipped = false
-                    secondCard?.isFlipped = false
+
+                    val unflipList = _memoryCardList.value.map {
+                        if ((it.id == firstCard?.id && it.isFlipped) || (it.id == secondCard?.id && it.isFlipped)) {
+                            Log.d("Flipcard", "Unflipping card with ID: ${it.id}")
+                            it.copy(isFlipped = false)
+                        } else {
+                            it
+                        }
+                    }
+                    _memoryCardList.value = unflipList
+
+                    Log.d("Flipcard", "firstCard after unflipping: ${firstCard?.id}, secondCard after unflipping: ${secondCard?.id}")
                     firstCard = null
                     secondCard = null
+                    Log.d("Flipcard", "firstCard after unflipping: ${firstCard?.id}, secondCard after unflipping: ${secondCard?.id}")
+                    Log.d("Flipcard", "firstCard and secondCard reset to null after unflipping")
                 }
             }
         }
@@ -164,11 +185,8 @@ class GameViewModel : ViewModel() {
 fun CardPairGameScreen(
     navController: NavController = rememberNavController(),
     viewModel: GameViewModel = viewModel()
-)
-{
-    val memoryCardList by viewModel.memoryCardList.collectAsState()
+) {
     val isPaused = viewModel.isPaused.value
-    val elapsedTime by viewModel.elapsedTime
 
     LaunchedEffect(Unit) {
         viewModel.startNewGame("easy")
@@ -180,84 +198,87 @@ fun CardPairGameScreen(
                 title = { Text("Memory Card Game") },
                 actions = {
                     IconButton(onClick = { viewModel.pause() }) {
-                        Icon(imageVector = Icons.Filled.Menu, contentDescription = "Pause Game")
+                        Icon(Icons.Filled.Menu, "Pause Game")
                     }
                 }
             )
-        },
-        modifier = Modifier.fillMaxSize()
+        }
     ) { paddingValues ->
-        Text(
-            text = "Elapsed Time: ${formatElapsedTime(elapsedTime)}",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier
-                .padding(32.dp)
-        )
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)) {
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Column(modifier = Modifier.fillMaxSize()) {
+                ElapsedTimeHeader(viewModel)
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp)
-            ) {
-                items(memoryCardList) { card ->
-                    MemoryCardView(card = card, onCardClick = {
-                        if (!isPaused) {
-                            viewModel.flipCard(it)
-                        }
-                    })
-                }
+                MemoryCardGrid(viewModel, isPaused)
             }
 
             if (isPaused) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 1f), shape = RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Elapsed Time: ${formatElapsedTime(elapsedTime)}",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(32.dp)
-                    )
+                PauseOverlay(viewModel)
+            }
+        }
+    }
+}
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            "Game Paused",
-                            color = Color.White,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = { viewModel.resume() }
-                        ) {
-                            Text("Resume Game")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = { viewModel.startNewGame("easy") }
-                        ) {
-                            Text("Restart Game")
-                        }
-                    }
+@Composable
+private fun ElapsedTimeHeader(viewModel: GameViewModel) {
+    val elapsedTime by viewModel.elapsedTime
+    Column() {
+        Text(
+            text = "Elapsed Time: ${formatElapsedTime(elapsedTime)}",
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .align(Alignment.CenterHorizontally)
+        )
+    }
+}
+
+@Composable
+private fun MemoryCardGrid(
+    viewModel: GameViewModel,
+    isPaused: Boolean
+) {
+    val memoryCardList by viewModel.memoryCardList.collectAsState()
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(4),
+        modifier = Modifier
+            .padding(32.dp)
+    ) {
+        items(memoryCardList) { card ->
+            MemoryCardView(card = card, onCardClick = {
+                if (!isPaused) {
+                    viewModel.flipCard(it)
                 }
+            })
+        }
+    }
+}
+
+@Composable
+private fun PauseOverlay(viewModel: GameViewModel) {
+    val elapsedTime by viewModel.elapsedTime
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "Game Paused",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = { viewModel.resume() }) {
+                Text("Resume Game")
+            }
+            Button(onClick = { viewModel.startNewGame("easy") }) {
+                Text("Restart Game")
             }
         }
     }
